@@ -2,3 +2,137 @@
 %! Date = 27/01/2022
 
 \section{Code Optimierung}
+\textbf{Aufgabe der Optimierung:}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Transformation von Intermediate Representation/Maschinencode zu effizienteren Version
+    \item Mögliche Intermediate Representations:
+    \SubItem{AST + Symbol Table}
+    \SubItem{Bytecode}
+    \SubItem{Anderer Intermediater Code (z.B. Three Address Code)}
+    \item Meist eine Serie von Optimierungsschritten
+\end{itemize}
+
+\subsection{Optimierte Arithmetik}
+\textbf{Multiplikation/Division:} Bit Shiften mit der Potenz (mal = links, geteilt = rechts)\\
+\textbf{Modulo:} x \% 32 $\rightarrow$ x \& 31
+
+\subsection{Algebraische Vereinfachung}
+Expr / 1 $\rightarrow$ Expr\\
+Expr * 0 $\rightarrow$ 0\\
+- - Expr $\rightarrow$ Expr\\
+1 + 3 $\rightarrow$ 4
+
+\subsection{Loop Invariant Code}
+\begin{lstlisting}
+// Wiederholt ausgewertete Teilausdrücke in temp Variable speichern
+while (x < N * M) {
+    k = y * M;
+    x = x + k;
+}
+
+// Optimiert:
+k = y * M;
+temp = N * M;
+while (x < temp) {
+    x = x + k;
+}
+\end{lstlisting}
+
+\subsection{Common Subexpressions}
+\begin{lstlisting}
+// Wiederholt ausgewertete Teilausdrücke in temp Variable speichern
+x = a * b + c
+...
+y = a * b + d
+
+temp = a * b;
+x = temp + c;
+...
+y = temp + d;
+\end{lstlisting}
+
+\subsection{Dead Code}
+\begin{lstlisting}
+a = readInt();
+b = a + 1;
+writeInt(a);
+c = b / 2; // Nicht gebraucht
+
+// Schritt 1
+a = readInt();
+b = a + 1; // Nicht mehr gebraucht
+writeInt(a);
+
+// Schritt 2
+a = readInt();
+writeInt(a);
+\end{lstlisting}
+
+\subsection{Copy Propagation}
+\begin{lstlisting}
+// Idee: Ersetze Variable durch zuletzt zugewiesenen Ausdruck
+t = x + y;
+u = t
+writeInt(u);
+
+// Schritt 1
+t = x + y;
+u = x + y
+writeInt(u);
+
+// Schritt 2
+t = x + y;
+u = x + y
+writeInt(x + y);
+
+// Schritt 3
+writeInt(x + y);
+\end{lstlisting}
+
+\subsection{Constant Propagation}
+Auch Constant Folding genannt. $\rightarrow$ Konstante Ausdrücke ersetzen.
+
+\subsection{Partial Redundancy}
+Optimieren, dass eine Redundante Berechnung nur ein mal pro Pfad ausgeführt wird.
+
+\subsection{Erkennung von Optimierungspotential}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Static Single Assignment
+    \item Peephole Optimization
+    \item Dataflow Analysis
+\end{itemize}
+
+\subsubsection{Static Single Assignment}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Code-Transformation für einfachere Analyse \& Optimierung
+    \item Jedes mal wenn x ein neuer Wert zugewiesen wird, eine neue Variable x2 anlegen
+    \SubItem{Phi Function bei Verzweigungen}
+    \item Relativ kompliziert und teuer
+    \item Günstigere Techniken gewünscht wie z.B. Peephole
+\end{itemize}
+
+\subsubsection{Peephole Optimization}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Optimierung für sehr kleine Anzahl Instruktionen
+    \item In JIT Compiler für Intermediate Code oder Maschinencode benutzt
+    \item Sliding Window mit z.B. 3 Instruktionen
+\end{itemize}
+
+\begin{lstlisting}
+ldc 2
+ldc 1
+imul     -->  ldc 2
+ldc 4         ldc 4   -->  ldc 6
+iadd          iadd
+\end{lstlisting}
+
+\subsubsection{Dataflow Analysis}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Mächtige generische Code-Analyse-Technik
+    \item Für viele Optimierungen nützlich
+\end{itemize}
