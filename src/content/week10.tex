@@ -2,3 +2,156 @@
 %! Date = 27/01/2022
 
 \section{Garbage Collection 1}
+\textbf{Zweck des Typ-deskriptors bis anhin:}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Ancestor Table für Typ-Test \& Cast
+    \item Virtual Method Table für Dynamic Dispatch
+    \item Interpreter Metadata bei Field-/Array-Typen
+    \item Neu: Pointer Offsets für Garbage Collection
+\end{itemize}
+\textbf{Explizite Freigabe:}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Könnte mit delete-Statement gelöst werden (C/C++)
+    \item Probleme:
+    \SubItem{Dangling Pointers: Referenz auf gelöschtes Objekt}
+    \SubItem{Memory Leaks: Verwaiste Objekte, die nicht abräumbar sind}
+\end{itemize}
+
+\subsection{Reference Counting}
+\textbf{Idee:} Pro eingehende Referenz Counter inkrementieren $\rightarrow$ Sofortige Deallokation wenn Counter wieder auf 0\\
+\textbf{Problem:} Bei zyklischen Abhängigkeiten wir Objekt nie zu Garbage. Ineffizient
+
+\subsection{Transitive Erreichbarkeit}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Objekte beibehalten, die das Programm noch zugreifen könnte
+    \item Alle direkt und indirekt über referenzen vom Programm erreichbaren Objekte
+    \item Ausgehend von Ankerpunkten (Root Set)
+\end{itemize}
+\textbf{Root Set:}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Referenzen in statischen Variablen (soweit benutzt)
+    \item Referenzen in Activation Frames auf Call Stack
+    \item Referenzen in Register (soweit benutzt)
+\end{itemize}
+
+\subsection{Mark \& Sweep Algorithmus}
+\textbf{Mark Phase:} Erreichbare Objekte markieren\\
+\textbf{Sweep Phase:} Alle nicht markierten Objekte löschen und Markierungen zurücksetzen\\
+\textbf{Rekursive Traversierung}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item GC braucht zusätzlichen Speicher für Stack
+    \item Problematisch, da Speicher sowieso schon knapp
+    \item Es existieren Algorithmen, für Traversierung ohne zusätzlichem Speicher
+\end{itemize}
+
+\subsection{Ausführungszeitpunkt}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Delayed Garbage Collection
+    \SubItem{Garbage wird nicht sofort erkannt und freigegeben}
+    \item GC läuft spätestens wenn Heap voll ist
+    \SubItem{Check beim Allozieren}
+    \item Eventuel prophylaktisch früher
+    \SubItem{Insbesondere bei Finalizer}
+\end{itemize}
+
+\textbf{Stop \& Go:}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item GC läuft sequentiell und exklusiv
+    \item Mutator = Produktives Programm
+    \item Mutator ist während GC unterbrochen
+\end{itemize}
+
+\subsection{Root Set Erkennung}
+Alle Pointers auf Call Stack:
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Pointer in Parameter
+    \item Pointer in lokalen Variablen
+    \item Pointer auf Evaluation Stack
+    \item this-Referenz
+\end{itemize}
+
+\subsection{Neue Heap Allozierung}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Traversiere freeList bis zu passendem Block
+    \item Überschuss des Blockes wieder in freeList einreihen
+\end{itemize}
+
+\textbf{Free List Strategien:}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item First Fit
+    \SubItem{Keine Sortierung}
+    \SubItem{Suche erst passenden Block}
+    \item Best Fit
+    \SubItem{Nach aufsteigender Grösse sortiert}
+    \SubItem{Unbrauchbar kleine Fragmente}
+    \item Worst Fit
+    \SubItem{Nach absteigender Grösse sortiert}
+    \SubItem{Finde passenden Block sofort}
+\end{itemize}
+
+\textbf{Segregated Free List:} Mehrere FreeLists mit verschiedenen Grössenklassen\\
+\textbf{Weitere Möglichkeiten:}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Benachbarte freie Blöcke verschmelzen (Am einfachsten in Sweep Phase)
+    \item Buddy System
+    \SubItem{Diskrete Blockgrössen nach Adresse geordnet}
+    \SubItem{Exponentielle Blockgrössen (z.B. 2er Potenz, Fibonacci)}
+    \SubItem{Sehr schnelles Verschmelzen \& Allozieren \& Freigabe}
+    \SubItem{Grosse interne Fragmentierung (unbrauchbare Reste)}
+    \item Compacting Garbage Collection
+\end{itemize}
+
+\subsection{Implementation}
+\begin{lstlisting}
+Iterabley<Pointer> getRootSet(CallStack callStack) {
+    var list = new ArrayList<Pointer>();
+    for (var frame : callStack) {
+        // collectPointers: Fügt vorhandene Pointers der list hinzu
+        collectPointers(frame.getParameters(), list);
+        collectPointers(frame.getLocals(), list);
+        collectPointers(frame.getEvaluationStack().toArray(), list);
+        list.add(frame.getThisReference());
+    }
+    return list
+}
+
+void mark(){
+    for (var root : getRootSet()) {
+        traverse(root);
+    }
+}
+
+void traverse(Pointer current) {
+    long block = heap.getAddress(current)-BLOCK_HEADER_SIZE;
+    if (!isMarked(block)) {
+        setMark(block);
+        for (var next : getPointers(current)) {
+            traverse(next);
+        }
+    }
+}
+
+void sweep() {
+    var current = HEAP_START;
+    while (current < HEAP_SIZE) {
+        if (!isMarked(current) \&\& !freeList.contains(current)) {
+            free(current);
+        }
+        clearMark(current);
+        current += heap.getBlockSize(current);
+    }
+}
+
+
+\end{lstlisting}

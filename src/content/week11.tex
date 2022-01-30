@@ -2,3 +2,106 @@
 %! Date = 27/01/2022
 
 \section{Garbage Collection 2}
+\textbf{GC braucht Metadaten:}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Pointer Offsets in Objekt
+    \SubItem{Via Typ-Deskriptor}
+    \item Pointer Offsets in Stack
+    \SubItem{Via Method Descriptor und Interpreter-Typen}
+    \item Pointers in register
+    \SubItem{Bei Interpreter nicht nötig}
+\end{itemize}
+
+\subsection{Finalizer}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Eine Methode, die vor Löschen des Objekts läuft
+    \SubItem{Abschlussarbeit: Verbindungen schliessen etc.}
+    \item Von GC initiiert, wenn Objekt zu Garbage geworden ist
+\end{itemize}
+
+\textbf{Finalizer wird nicht in GC-Phase ausgeführt, sondern erst später:}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Finalizer dauert evtl. beliebig lange
+    \SubItem{Würde GC blockieren}
+    \item Finalizer kann neue Objekte allozieren
+    \SubItem{Korrumpiert GC}
+    \item Programmierfehler im Finalizer
+    \SubItem{Evtl. Crash des GC}
+    \item Finalizer kann Objekt wieder weiterleben lassen
+    \SubItem{Resurrection}
+\end{itemize}
+
+\subsubsection{Resourrection}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Finalizer kann bewirken, dass Objekt wieder lebendig wird, also kein Garbage mehr ist
+    \item Nicht nur das eigene Objekt, sondern auch indirekt andere Objekte können wiederaufstehen
+\end{itemize}
+
+\subsubsection{Finalizer Internals}
+\textbf{Finalizer Set:} Registrierte Finalizer\\
+\textbf{Pending Queue:} Noch auszuführende Finalizer\\
+Wenn Objekt Garbage wird: Aus Finalizer Set löschen und in Pending Queue hinzufügen. Erst nach Pending Queue definitiv löschen.\\
+\textbf{Konsequenzen:}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item GC braucht 2 Mark Phasen
+    \SubItem{Markiere und erkenne Garbage mit Finalizer}
+    \SubItem{Markiere von Pending Queue erneut, dann Sweep}
+    \item Speicher kann evtl. nicht schnell genug frei werden
+\end{itemize}
+\textbf{Programmieraspekte:}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Reihenfolge der Finalizer ist unbestimmt
+    \item Finalizer laufen beliebig verzögert
+    \item Finalizer sind nebenläufig zum Hauptprogramm
+    \SubItem{Seperater Thread oder unbestimmt verzahnt}
+    \item Läuft der Finalizer nach resurrection wieder?
+    \SubItem{Nicht in java}
+\end{itemize}
+
+\subsection{Weak References}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Weak References zählt nicht als referenz für GC
+    \item Garbage kann mit Weak Reference noch so lange erreicht werden, bis es abgeräumt worden ist
+    \item Weak Reference wird nach Freigabe von Garbage Objekt auf null gesetzt
+    \item Weak Reference vor oder nach Finalizer freigeben? $\rightarrow$ Weak, Soft, Phantom Reference
+\end{itemize}
+
+\subsection{Compacting GC}
+\textbf{Problem:} Grosses Objekt müsste auf Heap alloziert werden, aber passt in keine Lücke (obschon genügend freier Speicher vorhanden wäre)\\
+\textbf{Lösung:}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Mark \& Copy GC
+    \item Allokation am Heap-Ende
+    \item GC schiebt Objekte wieder zusammen
+    \item Beim Verschieben müssen alle Referenzen nachgetragen werden
+    \item Konservative Methode daher unmöglich
+\end{itemize}
+
+\subsection{Inkrementeller GC}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item GC soll quasi-parallel zum Mutator laufen
+    \item Nur kleinste Unterbrüche (Inkrements)
+    \item Kein Stop \& Go / Stop the World $\rightarrow$ Möglichst kurze Unterbrüche
+\end{itemize}
+
+\textbf{Inkrementelle GCs}
+\begin{itemize}[topsep=0pt]
+    \itemsep -0.2em
+    \item Generational GC
+    \SubItem{Junge Objekte schneller freigeben}
+    \SubItem{Junge Objekte: Kurze Lebenserwartung, Alte Objekte: Lange Lebenserwartung}
+    \item Partioned GC
+    \SubItem{Heap partitionsweise verwalten}
+    \item Weitere Verfahren
+    \SubItem{Concurrent GC, Real-Time GC}
+\end{itemize}
+
